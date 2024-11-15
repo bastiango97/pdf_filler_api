@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser()); // Add this line to enable cookie parsing
 app.use(cors({
-    origin: 'http://localhost:3001', // Replace with the port where your React app is running
+    origin: ['http://localhost:3001', 'https://plataforma-formatos.onrender.com'], // Replace with the port where your React app is running
     credentials: true
 }));
 
