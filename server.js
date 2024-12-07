@@ -167,7 +167,7 @@ app.post('/logout', (req, res) => {
     res.cookie('token', '', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Strict',
+        sameSite: 'None',
         expires: new Date(0), // Set the expiration date to a past time
     });
     res.status(200).json({ message: 'Logged out successfully' });
