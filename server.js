@@ -13,6 +13,17 @@ app.use(cors({
     origin: ['http://localhost:3001', 'https://plataforma-formatos.onrender.com'], // Replace with the port where your React app is running
     credentials: true
 }));
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use TLS
+    auth: {
+        user: 'demo.agencias.camunda7@gmail.com', // Your Gmail address
+        pass: 'osji wsyo pibg rhnm'              // Your app password
+    }
+});
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -28,21 +39,46 @@ const pool = new Pool({
 const jwtSecret = process.env.JWT_SECRET;
 const saltRounds = 10;
 
-// Register a new user
 app.post('/register', async (req, res) => {
     const { email, password, firstName, lastName } = req.body;
 
     try {
+        // Check if the user already exists
+        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ error: 'Email already in use' });
+        }
+
         // Hash the password
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
+        // Generate a verification token
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationTokenExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // Expires in 1 hour
+
         // Insert the new user into the database
         const result = await pool.query(
-            'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING *',
-            [email, passwordHash, firstName, lastName]
+            `INSERT INTO users (email, password_hash, first_name, last_name, verification_token, verification_token_expires)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [email, passwordHash, firstName, lastName, verificationToken, verificationTokenExpires]
         );
 
-        res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].user_id });
+        // Send a verification email
+        const verificationLink = `http://localhost:3001/verify-account?token=${verificationToken}`; // Replace with your frontend URL
+        await transporter.sendMail({
+            from: '"Demo Agencias" <demo.agencias.camunda7@gmail.com>', // Sender's name and email
+            to: email, // Recipient's email
+            subject: 'Verify Your Account',
+            html: `
+                <h1>Verify Your Account</h1>
+                <p>Hi ${firstName},</p>
+                <p>Click the link below to verify your account:</p>
+                <a href="${verificationLink}">Verify Account</a>
+                <p>This link will expire in 1 hour.</p>
+            `
+        });
+
+        res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
     } catch (error) {
         if (error.code === '23505') { // Unique constraint violation (duplicate email)
             res.status(400).json({ error: 'Email already in use' });
