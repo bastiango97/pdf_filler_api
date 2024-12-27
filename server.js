@@ -16,14 +16,15 @@ app.use(cors({
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use TLS
+    host: 'mail.migestor.io',
+    port: 465,
+    secure: true,
     auth: {
-        user: 'demo.agencias.camunda7@gmail.com', // Your Gmail address
-        pass: 'osji wsyo pibg rhnm'              // Your app password
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
 });
+
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -38,6 +39,8 @@ const pool = new Pool({
 
 const jwtSecret = process.env.JWT_SECRET;
 const saltRounds = 10;
+
+const BASE_URL = process.env.BASE_URL;
 
 app.post('/register', async (req, res) => {
     const { email, password, firstName, lastName } = req.body;
@@ -64,9 +67,9 @@ app.post('/register', async (req, res) => {
         );
 
         // Send a verification email
-        const verificationLink = `http://localhost:3001/verify-account?token=${verificationToken}`; // Replace with your frontend URL
+        const verificationLink = `${BASE_URL}/verify-account?token=${verificationToken}`;
         await transporter.sendMail({
-            from: '"Demo Agencias" <demo.agencias.camunda7@gmail.com>', // Sender's name and email
+            from: '"MiGestor" <no-reply@migestor.io>', // Sender's name and email
             to: email, // Recipient's email
             subject: 'Verify Your Account',
             html: `
@@ -88,6 +91,41 @@ app.post('/register', async (req, res) => {
         }
     }
 });
+
+app.post('/verify-account', async (req, res) => {
+    const { token } = req.body; // Extract the token from the request body
+
+    if (!token) {
+        return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    try {
+        // Find the user with the given verification token
+        const result = await pool.query(
+            `SELECT * FROM users WHERE verification_token = $1`,
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired verification token' });
+        }
+
+        const user = result.rows[0];
+
+        // Update the user's record to mark the account as verified
+        await pool.query(
+            `UPDATE users SET is_verified = TRUE, verification_token = NULL, verification_token_expires = NULL WHERE user_id = $1`,
+            [user.user_id]
+        );
+
+        res.status(200).json({ message: 'Account verified successfully. You can now log in.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
 
 // Login a user
 app.post('/login', async (req, res) => {
@@ -126,6 +164,95 @@ app.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    try {
+        // Check if the user exists
+        const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'No account found with that email' });
+        }
+
+        const user = result.rows[0];
+
+        // Generate a reset token and expiration
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // Token expires in 15 minutes
+
+        // Update the user record with the reset token and expiration
+        await pool.query(
+            `UPDATE users SET reset_password_token = $1, reset_password_token_expires = $2 WHERE user_id = $3`,
+            [resetToken, resetTokenExpires, user.user_id]
+        );
+
+        // Send the password reset email
+        const resetLink = `${BASE_URL}/reset-password?token=${resetToken}`;
+        await transporter.sendMail({
+            from: '"MiGestor" <no-reply@migestor.io>', // Sender's name and email
+            to: email, // Recipient's email
+            subject: 'Reset Your Password',
+            html: `
+                <h1>Reset Your Password</h1>
+                <p>Hi ${user.first_name},</p>
+                <p>Click the link below to reset your password. This link will expire in 15 minutes:</p>
+                <a href="${resetLink}">Reset Password</a>
+                <p>If you did not request this, please ignore this email.</p>
+            `
+        });
+
+        res.status(200).json({ message: 'Password reset email sent. Please check your inbox.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+app.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+        return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    try {
+        // Find the user with the provided reset token and ensure the token has not expired
+        const result = await pool.query(
+            `SELECT * FROM users WHERE reset_password_token = $1`,
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        const user = result.rows[0];
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update the user's password and invalidate the reset token
+        await pool.query(
+            `UPDATE users SET password_hash = $1, reset_password_token = NULL, reset_password_token_expires = NULL WHERE user_id = $2`,
+            [hashedPassword, user.user_id]
+        );
+
+        res.status(200).json({ message: 'Password reset successfully. You can now log in with your new password.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
 
 app.get('/formats', authenticateToken, async (req, res) => {
     try {
