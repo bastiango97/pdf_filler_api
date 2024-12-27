@@ -57,7 +57,9 @@ app.post('/register', async (req, res) => {
 
         // Generate a verification token
         const verificationToken = crypto.randomBytes(32).toString('hex');
-        const verificationTokenExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // Expires in 1 hour
+        // Set token expiration to 1 month (30 days)
+        const verificationTokenExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days in milliseconds
+
 
         // Insert the new user into the database
         const result = await pool.query(
@@ -71,15 +73,73 @@ app.post('/register', async (req, res) => {
         await transporter.sendMail({
             from: '"MiGestor" <no-reply@migestor.io>', // Sender's name and email
             to: email, // Recipient's email
-            subject: 'Verify Your Account',
+            subject: 'Verifica tu cuenta - MiGestor',
             html: `
-                <h1>Verify Your Account</h1>
-                <p>Hi ${firstName},</p>
-                <p>Click the link below to verify your account:</p>
-                <a href="${verificationLink}">Verify Account</a>
-                <p>This link will expire in 1 hour.</p>
+                <div style="
+                    font-family: Arial, sans-serif;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                ">
+                    <div style="
+                        background-color: #004085;
+                        color: #ffffff;
+                        text-align: center;
+                        padding: 20px;
+                    ">
+                        <h1 style="margin: 0; font-size: 24px;">¡Verifica tu cuenta!</h1>
+                    </div>
+                    <div style="
+                        padding: 30px;
+                        color: #444444;
+                        line-height: 1.6;
+                    ">
+                        <p>Hola <strong>${firstName}</strong>,</p>
+                        <p>
+                            Gracias por registrarte en <strong>MiGestor</strong>. Para completar tu registro y activar tu cuenta,
+                            haz clic en el botón de abajo.
+                        </p>
+                        <div style="
+                            text-align: center;
+                            margin: 30px 0;
+                        ">
+                            <a href="${verificationLink}" style="
+                                background-color: #28a745;
+                                color: #ffffff;
+                                text-decoration: none;
+                                padding: 12px 24px;
+                                font-size: 16px;
+                                border-radius: 5px;
+                                display: inline-block;
+                            ">
+                                Verificar Cuenta
+                            </a>
+                        </div>
+                        <p>
+                            Si tienes algún problema, no dudes en ponerte en contacto con nuestro equipo de soporte.
+                        </p>
+                    </div>
+                    <div style="
+                        background-color: #f8f9fa;
+                        color: #888888;
+                        text-align: center;
+                        padding: 15px;
+                        font-size: 12px;
+                    ">
+                        <p style="margin: 0;">&copy; ${new Date().getFullYear()} MiGestor. Todos los derechos reservados.</p>
+                        <p style="margin: 0;">
+                            <a href="https://migestor.io/privacidad" style="color: #888888; text-decoration: none;">Política de Privacidad</a>
+                            |
+                            <a href="https://migestor.io/soporte" style="color: #888888; text-decoration: none;">Soporte</a>
+                        </p>
+                    </div>
+                </div>
             `
         });
+        
 
         res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
     } catch (error) {
@@ -185,7 +245,9 @@ app.post('/forgot-password', async (req, res) => {
 
         // Generate a reset token and expiration
         const resetToken = crypto.randomBytes(32).toString('hex');
-        const resetTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // Token expires in 15 minutes
+        // Set reset token expiration to 1 hour
+        const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour in milliseconds
+
 
         // Update the user record with the reset token and expiration
         await pool.query(
@@ -198,15 +260,73 @@ app.post('/forgot-password', async (req, res) => {
         await transporter.sendMail({
             from: '"MiGestor" <no-reply@migestor.io>', // Sender's name and email
             to: email, // Recipient's email
-            subject: 'Reset Your Password',
+            subject: 'Restablece tu contraseña - MiGestor',
             html: `
-                <h1>Reset Your Password</h1>
-                <p>Hi ${user.first_name},</p>
-                <p>Click the link below to reset your password. This link will expire in 15 minutes:</p>
-                <a href="${resetLink}">Reset Password</a>
-                <p>If you did not request this, please ignore this email.</p>
+                <div style="
+                    font-family: Arial, sans-serif;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                ">
+                    <div style="
+                        background-color: #dc3545;
+                        color: #ffffff;
+                        text-align: center;
+                        padding: 20px;
+                    ">
+                        <h1 style="margin: 0; font-size: 24px;">¡Restablece tu contraseña!</h1>
+                    </div>
+                    <div style="
+                        padding: 30px;
+                        color: #444444;
+                        line-height: 1.6;
+                    ">
+                        <p>Hola <strong>${user.first_name}</strong>,</p>
+                        <p>
+                            Hemos recibido una solicitud para restablecer tu contraseña en <strong>MiGestor</strong>. 
+                            Si realizaste esta solicitud, haz clic en el botón de abajo para establecer una nueva contraseña.
+                        </p>
+                        <div style="
+                            text-align: center;
+                            margin: 30px 0;
+                        ">
+                            <a href="${resetLink}" style="
+                                background-color: #28a745;
+                                color: #ffffff;
+                                text-decoration: none;
+                                padding: 12px 24px;
+                                font-size: 16px;
+                                border-radius: 5px;
+                                display: inline-block;
+                            ">
+                                Restablecer Contraseña
+                            </a>
+                        </div>
+                        <p>
+                            Si no realizaste esta solicitud, puedes ignorar este mensaje. Tu cuenta seguirá siendo segura.
+                        </p>
+                    </div>
+                    <div style="
+                        background-color: #f8f9fa;
+                        color: #888888;
+                        text-align: center;
+                        padding: 15px;
+                        font-size: 12px;
+                    ">
+                        <p style="margin: 0;">&copy; ${new Date().getFullYear()} MiGestor. Todos los derechos reservados.</p>
+                        <p style="margin: 0;">
+                            <a href="https://migestor.io/privacidad" style="color: #888888; text-decoration: none;">Política de Privacidad</a>
+                            |
+                            <a href="https://migestor.io/soporte" style="color: #888888; text-decoration: none;">Soporte</a>
+                        </p>
+                    </div>
+                </div>
             `
         });
+        
 
         res.status(200).json({ message: 'Password reset email sent. Please check your inbox.' });
     } catch (error) {
