@@ -7,6 +7,7 @@ const authenticateToken = require('./middleware/authenticateToken');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const app = express();
+const axios = require('axios');
 app.use(express.json());
 app.use(cookieParser()); // Add this line to enable cookie parsing
 app.use(cors({
@@ -37,10 +38,61 @@ const pool = new Pool({
     },
 });
 
+
+//Authentication for ADMIN 
+const FORMIO_ADMIN_EMAIL = process.env.FORMIO_ADMIN_EMAIL;
+const FORMIO_ADMIN_PASSWORD = process.env.FORMIO_ADMIN_PASSWORD;
+const FORMIO_PROJECT_URL = process.env.FORMIO_PROJECT_URL;
 const jwtSecret = process.env.JWT_SECRET;
 const saltRounds = 10;
 
 const BASE_URL = process.env.BASE_URL;
+
+//FUNCIONES PARA DESCARGAR EL PDF DE LA API DE FORMIO 
+async function authenticateAdmin() {
+    const response = await axios.post(`${FORMIO_PROJECT_URL}/admin/login`, {
+        data: {
+            email: FORMIO_ADMIN_EMAIL,
+            password: FORMIO_ADMIN_PASSWORD,
+        },
+    });
+    return response.headers['x-jwt-token'];
+}
+
+async function createDownloadToken(jwtToken, formId, submissionId) {
+    const response = await axios.get(`${FORMIO_PROJECT_URL}/token`, {
+        headers: {
+            'x-allow': `GET:/form/${formId}/submission/${submissionId}/download`,
+            'x-expire': '86400',
+            'x-jwt-token': jwtToken,
+        },
+    });
+    return response.data.key;
+}
+
+app.post('/generate-download-link', async (req, res) => {
+    const { formId, submissionId } = req.body;
+
+    try {
+        // Step 1: Authenticate as Admin
+        const jwtToken = await authenticateAdmin();
+
+        // Step 2: Create the Download Token
+        const downloadKey = await createDownloadToken(jwtToken, formId, submissionId);
+
+        // Step 3: Generate the Download Link
+        const downloadLink = `${FORMIO_PROJECT_URL}/form/${formId}/submission/${submissionId}/download?token=${downloadKey}`;
+
+        // Step 4: Send the Link to the Frontend
+        res.json({ downloadLink });
+    } catch (error) {
+        console.error('Error generating download link:', error.message);
+        res.status(500).json({ error: 'Failed to generate download link' });
+    }
+});
+
+
+
 
 app.post('/register', async (req, res) => {
     const { email, password, firstName, lastName } = req.body;
