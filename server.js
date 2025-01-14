@@ -563,6 +563,7 @@ app.get('/formats/:companyId/:formatId', authenticateToken, async (req, res) => 
         // Query to get the format and associated PDF for the specified company and format name
         const result = await pool.query(`
             SELECT 
+                f.id AS format_id,
                 f.name AS format_name,
                 f.form_io_link AS api_link,
                 pdf.filename AS pdf_filename,
@@ -584,6 +585,7 @@ app.get('/formats/:companyId/:formatId', authenticateToken, async (req, res) => 
 
         // Extract format details
         const format = {
+            format_id: result.rows[0].format_id,
             format_name: result.rows[0].format_name,
             api_link: result.rows[0].api_link,
             pdf_filename: result.rows[0].pdf_filename,
@@ -596,6 +598,7 @@ app.get('/formats/:companyId/:formatId', authenticateToken, async (req, res) => 
         res.status(500).json({ error: 'Server error while fetching format details' });
     }
 });
+
 
 // REGISTRO DE LLENADO DE FORMATOS
 app.post('/create-registration', authenticateToken, async (req, res) => {
