@@ -630,6 +630,39 @@ app.post('/create-registration', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/registrations', authenticateToken, async (req, res) => {
+    const agentId = req.user.userId; // Extract agent ID from JWT
+
+    try {
+        const query = `
+            SELECT 
+                r.registration_id, 
+                f.name AS format_name,
+                r.created_at,
+                r.status,
+                r.notes
+            FROM 
+                registrations r
+            JOIN 
+                formato f ON r.format_id = f.id
+            WHERE 
+                r.agent_id = $1
+            ORDER BY 
+                r.created_at DESC;
+        `;
+        const result = await pool.query(query, [agentId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'No registrations found for this agent' });
+        }
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error fetching registrations:', error);
+        res.status(500).json({ error: 'Failed to fetch registrations' });
+    }
+});
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;
