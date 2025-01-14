@@ -597,6 +597,37 @@ app.get('/formats/:companyId/:formatId', authenticateToken, async (req, res) => 
     }
 });
 
+// REGISTRO DE LLENADO DE FORMATOS
+app.post('/create-registration', authenticateToken, async (req, res) => {
+    const {
+        format_id,
+        assignee_id, // Optional
+        form_id,
+        submission_id,
+        status, // Optional
+        notes, // Optional
+    } = req.body;
+
+    try {
+        // Extract agent_id from the JWT token (via the middleware)
+        const agent_id = req.user.userId;
+
+        // Insert into the registrations table
+        const result = await pool.query(
+            `INSERT INTO registrations (agent_id, format_id, assignee_id, form_id, submission_id, created_at, status, notes)
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
+             RETURNING *`,
+            [agent_id, format_id, assignee_id || null, form_id, submission_id, status || 'created', notes || null]
+        );
+
+        res.status(201).json({ message: 'Registration created successfully', registration: result.rows[0] });
+    } catch (error) {
+        console.error('Error creating registration:', error.message);
+        res.status(500).json({ error: 'Failed to create registration' });
+    }
+});
+
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
