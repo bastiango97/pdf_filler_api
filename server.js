@@ -638,6 +638,8 @@ app.get('/registrations', authenticateToken, async (req, res) => {
             SELECT 
                 r.registration_id, 
                 f.name AS format_name,
+                r.form_id,
+                r.submission_id,
                 r.created_at,
                 r.status,
                 r.notes
