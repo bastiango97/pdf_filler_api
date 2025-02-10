@@ -665,7 +665,25 @@ app.get('/registrations', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/form-name/:formId', async (req, res) => {
+    const { formId } = req.params;
 
+    try {
+        const jwtToken = await authenticateAdmin();
+
+        const response = await axios.get(`${FORMIO_PROJECT_URL}/form/${formId}`, {
+            headers: {
+                'x-jwt-token': jwtToken,
+            },
+        });
+
+        const formName = response.data.name;
+        return res.json({ formName });
+    } catch (error) {
+        console.error('Error fetching form details:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to retrieve form name.' });
+    }
+});
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
